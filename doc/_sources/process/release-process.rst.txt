@@ -1,0 +1,64 @@
+.. _release-process:
+
+Development and Release Process
+===============================
+
+Skiboot follows the release cycle of `op-build`, so that each new op-build
+has a new stable skiboot. Currently, this means that we release once every
+six weeks (or so). Our *goal* is to have roughly the first 4 weeks of a
+6 week cycle open for merging new features, and reserving the final two
+weeks for stabilisation efforts after the first -rcX release.
+
+It is *strongly* preferred to have new features (especially new APIs and
+device tree bindings) to come in *early* in the cycle.
+
+Once the final release is cut, the :ref:`stable-rules` process takes over.
+
+Our process has evolved, and will so into the future. It's inspired by the
+Linux process, but not a slave to it. For example, there is currently not
+the volume of patches to justify a next tree.
+
+Here's how some of the recent (at time of writing) releases have gone:
+
+============= =========
+Date          Release
+============= =========
+Oct 31st 2017 v5.9
+Feb 6th 2018  v5.10-rc1
+Feb 9th 2018  v5.10-rc2
+Feb 15th 2018 v5.10-rc3
+Feb 21st 2018 v5.10-rc4
+Feb 23rd 2018 v5.10
+Mar 28th 2018 v5.11-rc1
+Apr 6th 2018  v5.11
+============= =========
+
+
+Why get your code accepted upstream
+-----------------------------------
+
+
+
+
+On closed source branches and forks
+-----------------------------------
+
+Even though the license that skiboot is distributed under does *allow* you
+to keep your changes private, we (the skiboot developers) cannot in any way
+provide support on the resulting code base.
+
+Additionally, the broader PowerPC Linux community has neither the capacity,
+time, or resources to support Linux running on such closed source forks.
+The kernel developers have said that patches to the kernel to support or
+work around closed skiboot changes will *not* be accepted upstream.
+
+If you keep your changes private, you are *entirely* on your own.
+
+License
+-------
+
+Skiboot is licensed under the Apache 2.0 license (see the LICENSE file in the
+source tree for the full text).
+
+Portions (e.g. our libc, CCAN modules we use) are made available under a CC0, BSD,
+or BSD-MIT license (see LICENSE files for specifics).
