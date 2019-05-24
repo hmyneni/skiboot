@@ -18,6 +18,7 @@
 #include <phys-map.h>
 #include <xscom.h>
 #include <io.h>
+#include <xive.h>
 #include <vas.h>
 
 #define vas_err(__fmt,...)	prlog(PR_ERR,"VAS: " __fmt, ##__VA_ARGS__)
@@ -132,6 +133,39 @@ __attrconst uint64_t vas_get_wcbs_bar(int chipid)
 
 	return chip->vas->wcbs;
 }
+
+static inline struct proc_chip *vas_id_to_chip(int vasid)
+{
+	struct proc_chip *chip;
+
+	for_each_chip(chip) {
+		if (chip->vas->vas_id == vasid)
+			return chip;
+	}
+
+	return NULL;
+}
+
+static int opal_vas_get_trigger_port(uint32_t vasid, uint32_t *irq,
+				uint64_t *port)
+{
+	struct proc_chip *chip;
+
+	chip = vas_id_to_chip(vasid);
+	if (!chip)
+		return OPAL_PARAMETER;
+
+	if (!chip->vas->vas_irq) {
+		vas_vdbg("ERROR: chip %d vas->vas_irq NULL!\n", chip->id);
+		return OPAL_PARAMETER;
+	}
+
+	*irq = chip->vas->vas_irq;
+	*port = (uint64_t)xive_get_trigger_port(*irq);
+
+	return OPAL_SUCCESS;
+}
+opal_call(OPAL_VAS_GET_TRIGGER_PORT, opal_vas_get_trigger_port, 3);
 
 static int init_north_ctl(struct proc_chip *chip)
 {
@@ -436,6 +470,28 @@ static void disable_vas_inst(struct dt_node *np)
 }
 
 /*
+ * CHECK: Is one irq per chip right? Do we need one per window?
+ *       Or just one irq for all chips?
+ *
+ * TODO: Do we need to free these at some point ???
+ */
+static int alloc_irq(struct proc_chip *chip)
+{
+	int align = 128;
+	uint32_t irq;
+
+	irq = xive_alloc_ipi_irqs(chip->id, 1, align);
+	if (irq == XIVE_IRQ_ERROR)
+		return -1;
+
+	vas_vdbg("trigger port: 0x%p\n", xive_get_trigger_port(irq));
+
+	chip->vas->vas_irq = irq;
+
+	return 0;
+}
+
+/*
  * Initialize one VAS instance and enable it if @enable is true.
  */
 static int init_vas_inst(struct dt_node *np, bool enable)
@@ -462,6 +518,9 @@ static int init_vas_inst(struct dt_node *np, bool enable)
 
 	if (init_wcm(chip) || init_uwcm(chip) || init_north_ctl(chip) ||
 	    			init_rma(chip))
+		return -1;
+
+	if (alloc_irq(chip))
 		return -1;
 
 	create_mm_dt_node(chip);
