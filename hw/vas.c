@@ -18,6 +18,7 @@
 #include <phys-map.h>
 #include <xscom.h>
 #include <io.h>
+#include <xive.h>
 #include <vas.h>
 
 #define vas_err(__fmt,...)	prlog(PR_ERR,"VAS: " __fmt, ##__VA_ARGS__)
@@ -36,6 +37,7 @@ struct vas {
 	uint64_t	xscom_base;
 	uint64_t	wcbs;
 	uint32_t	vas_irq;
+	uint64_t	vas_port;
 };
 
 static inline void get_hvwc_mmio_bar(int chipid, uint64_t *start, uint64_t *len)
@@ -414,6 +416,8 @@ static void create_mm_dt_node(struct proc_chip *chip)
 
 	dt_add_property(dn, "ibm,vas-id", &vas->vas_id, sizeof(vas->vas_id));
 	dt_add_property(dn, "ibm,chip-id", &gcid, sizeof(gcid));
+	dt_add_property(dn, "ibm,vas-irq", &vas->vas_irq, sizeof(vas->vas_irq));
+	dt_add_property_u64(dn, "ibm,vas-port", vas->vas_port);
 }
 
 /*
@@ -433,6 +437,25 @@ static void disable_vas_inst(struct dt_node *np)
 	free_wcbs(chip);
 
 	reset_north_ctl(chip);
+}
+
+static int vas_setup_irq(struct proc_chip *chip)
+{
+	uint32_t irq;
+	uint64_t port;
+
+	irq = xive_alloc_ipi_irqs(chip->id, 1, 64);
+	if (irq == XIVE_IRQ_ERROR)
+		return -1;
+
+	vas_vdbg("trigger port: 0x%p\n", xive_get_trigger_port(irq));
+
+	port = (uint64_t)xive_get_trigger_port(irq);
+
+	chip->vas->vas_irq = irq;
+	chip->vas->vas_port = port;
+
+	return 0;
 }
 
 /*
@@ -462,6 +485,9 @@ static int init_vas_inst(struct dt_node *np, bool enable)
 
 	if (init_wcm(chip) || init_uwcm(chip) || init_north_ctl(chip) ||
 	    			init_rma(chip))
+		return -1;
+
+	if (vas_setup_irq(chip))
 		return -1;
 
 	create_mm_dt_node(chip);
